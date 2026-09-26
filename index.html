@@ -1,0 +1,1458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IPL Pulse — Match Intelligence Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<style>
+  :root{
+    --navy:#061936;
+    --navy-deep:#051736;
+    --navy-light:#112240;
+    --card:rgba(17,34,64,0.72);
+    --card-border:rgba(255,215,0,0.16);
+    --gold:#FFD700;
+    --gold-dim:#f1ca07;
+    --cyan:#00d2ff;
+    --purple:#8a5cff;
+    --green:#00e676;
+    --red:#ff5470;
+    --dim:#8892b0;
+    --dim2:#5c6b8a;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(112,0,255,0.16), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 0%, rgba(0,210,255,0.10), transparent 55%),
+      var(--navy);
+    color:#eaf0ff;
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    padding:28px 22px 60px;
+  }
+  .mono{font-family:'JetBrains Mono',monospace;}
+  .disp{font-family:'Space Grotesk',sans-serif;}
+
+  /* ---------- Hero ---------- */
+  .hero{max-width:1180px;margin:0 auto 26px;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:14px;border-bottom:1px solid rgba(255,215,0,0.14);padding-bottom:18px;}
+  .hero-title{display:flex;align-items:center;gap:12px;}
+  .pulse-dot{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(0,230,118,.6);animation:pulse 1.8s infinite;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(0,230,118,.55);}70%{box-shadow:0 0 0 9px rgba(0,230,118,0);}100%{box-shadow:0 0 0 0 rgba(0,230,118,0);}}
+  .hero h1{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(28px,4vw,42px);margin:0;letter-spacing:-0.02em;
+    background:linear-gradient(90deg,#fff 30%, var(--gold) 100%);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .hero .eyebrow{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.18em;color:var(--cyan);text-transform:uppercase;margin-bottom:6px;display:block;}
+  .hero p{color:var(--dim);margin:6px 0 0;font-size:14.5px;max-width:540px;}
+  .hero-stats{display:flex;gap:22px;}
+  .hero-stats div{text-align:right;}
+  .hero-stats .n{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;color:var(--gold);}
+  .hero-stats .l{font-size:10.5px;color:var(--dim2);text-transform:uppercase;letter-spacing:0.08em;}
+
+  /* ---------- Tabs ---------- */
+  .tabbar{max-width:1180px;margin:0 auto 22px;display:flex;gap:8px;flex-wrap:wrap;}
+  .tabbtn{
+    background:var(--navy-light);border:1px solid rgba(255,255,255,0.06);color:var(--dim);
+    padding:10px 18px;border-radius:999px;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13.5px;
+    cursor:pointer;transition:all .2s ease;display:flex;align-items:center;gap:7px;
+  }
+  .tabbtn:hover{color:#fff;border-color:rgba(255,215,0,0.3);}
+  .tabbtn.active{background:linear-gradient(135deg, rgba(255,215,0,0.16), rgba(0,210,255,0.08));color:var(--gold);border-color:var(--gold);box-shadow:0 0 18px rgba(255,215,0,0.12);}
+
+  .wrap{max-width:1180px;margin:0 auto;}
+  .panel{display:none;animation:fadeIn .35s ease;}
+  .panel.active{display:block;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+  .glass{
+    background:var(--card);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border:1px solid var(--card-border);border-radius:16px;padding:22px;
+    box-shadow:0 10px 34px rgba(0,0,0,0.4);margin-bottom:18px;
+  }
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  @media(max-width:820px){.grid2,.grid3{grid-template-columns:1fr;}}
+
+  h2.sec{font-family:'Space Grotesk',sans-serif;color:#fff;font-size:18px;margin:0 0 4px;display:flex;align-items:center;gap:8px;}
+  .sec-sub{color:var(--dim);font-size:12.5px;margin:0 0 16px;}
+
+  label{display:block;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:var(--cyan);font-weight:600;margin-bottom:6px;}
+  select, input[type=range]{width:100%;}
+  select{
+    background:var(--navy-light);color:var(--gold);border:1px solid rgba(0,210,255,0.35);
+    border-radius:8px;padding:9px 10px;font-family:'Inter',sans-serif;font-weight:600;font-size:13.5px;
+  }
+  .field{margin-bottom:14px;}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+  @media(max-width:640px){.row,.row3{grid-template-columns:1fr;}}
+
+  input[type=range]{appearance: none;          /* Standard property */-webkit-appearance: none;  /* Chrome, Safari */-moz-appearance: none;     /* Firefox (optional) */height:6px;
+    border-radius:4px;
+    background:var(--navy-light);
+    outline:none;
+}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;background:var(--gold);cursor:pointer;box-shadow:0 0 8px rgba(255,215,0,0.6);}
+  .range-val{font-family:'JetBrains Mono',monospace;color:var(--gold);font-weight:700;float:right;}
+
+  .btn{
+    width:100%;padding:13px;border:none;border-radius:10px;cursor:pointer;
+    font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;letter-spacing:0.02em;
+    background:linear-gradient(135deg,var(--gold),#ffb300);color:#1a1300;
+    box-shadow:0 6px 20px rgba(255,215,0,0.25);transition:transform .15s ease;
+  }
+  .btn:hover{transform:translateY(-1px);}
+  .btn:active{transform:translateY(0);}
+
+  /* gauge / floodlight beam */
+  .gauge-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 0 0;}
+  .gauge-label{font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--dim);margin-top:6px;}
+  .gauge-value{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;}
+
+  .split-bar{display:flex;height:14px;border-radius:8px;overflow:hidden;background:#1c2c4a;margin-top:6px;}
+  .split-seg{transition:width .5s ease;}
+  .team-vs{display:flex;justify-content:space-between;align-items:center;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px;margin-top:4px;}
+
+  .team-chip{display:flex;align-items:center;gap:8px;}
+  .avatar{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px;color:#04101f;flex-shrink:0;}
+
+  .stat-card{background:var(--navy-light);border:1px solid rgba(255,255,255,0.05);border-radius:12px;padding:14px 16px;}
+  .stat-card .k{font-size:10.5px;text-transform:uppercase;letter-spacing:0.07em;color:var(--dim2);margin-bottom:5px;}
+  .stat-card .v{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:#fff;}
+  .stat-card .v.gold{color:var(--gold);}
+  .stat-card .v.red{color:var(--red);}
+  .stat-card .v.cyan{color:var(--cyan);}
+
+  .chart-box{position:relative;height:270px;}
+  .chart-box.tall{height:320px;}
+
+  .empty-note{color:var(--dim);font-size:13px;padding:20px 0;text-align:center;}
+
+  .profile-head{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+  .profile-head .avatar{width:46px;height:46px;font-size:16px;border-radius:12px;}
+  .trophy{color:var(--gold);}
+
+  footer{max-width:1180px;margin:30px auto 0;color:var(--dim2);font-size:11.5px;text-align:center;font-family:'JetBrains Mono',monospace;}
+
+  ::-webkit-scrollbar{height:8px;width:8px;}
+  ::-webkit-scrollbar-thumb{background:rgba(255,215,0,0.25);border-radius:6px;}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div>
+    <span class="eyebrow">● live pulse dot / Elo-driven intelligence</span>
+    <div class="hero-title">
+      <h1>IPL PULSE</h1>
+    </div>
+    <p>A floodlight view into franchise form, live chase dynamics, and head-to-head matchups — built on dynamic Elo ratings and venue chase bias, updated ball by ball.</p>
+  </div>
+  <div class="hero-stats">
+    <div><div class="n" id="statSeasons">—</div><div class="l">Seasons</div></div>
+    <div><div class="n" id="statMatches">—</div><div class="l">Matches</div></div>
+    <div><div class="n" id="statBalls">—</div><div class="l">Deliveries</div></div>
+  </div>
+</div>
+
+<div class="tabbar" id="tabbar">
+  <button class="tabbtn" data-tab="predict">🏏 Pre-Match Predictor</button>
+  <button class="tabbtn" data-tab="live">⚡ Live In-Play Engine</button>
+  <button class="tabbtn" data-tab="matchup">⚔️ Matchup Matrix</button>
+  <button class="tabbtn" data-tab="analytics">📊 Visual Analytics</button>
+  <button class="tabbtn" data-tab="venue">🏟️ Venue Intelligence</button>
+</div>
+
+<div class="wrap">
+
+  <!-- ============ TAB 1: PRE-MATCH PREDICTOR ============ -->
+  <div class="panel" id="panel-predict">
+    <div class="glass">
+      <h2 class="sec">🏏 Pre-Match Winner Engine</h2>
+      <p class="sec-sub">Dynamic Elo differential + venue chase bias + toss context, calibrated across every simulated fixture.</p>
+      <div class="row">
+        <div class="field"><label>Team A</label><select id="t1Select"></select></div>
+        <div class="field"><label>Team B</label><select id="t2Select"></select></div>
+      </div>
+      <div class="row3">
+        <div class="field"><label>Venue</label><select id="venueSelect"></select></div>
+        <div class="field"><label>Toss Winner</label><select id="tossWSelect"></select></div>
+        <div class="field"><label>Toss Choice</label><select id="tossDSelect">
+          <option value="field">Field First</option><option value="bat">Bat First</option>
+        </select></div>
+      </div>
+      <button class="btn" id="runPredictBtn">RUN PRE-MATCH PREDICTION 🚀</button>
+    </div>
+    <div class="glass" id="predictResult" style="display:none;"></div>
+  </div>
+
+  <!-- ============ TAB 2: LIVE IN-PLAY ============ -->
+  <div class="panel" id="panel-live">
+    <div class="grid2">
+      <div class="glass">
+        <h2 class="sec">⚡ Live Inning-2 Pursuit Dynamics</h2>
+        <p class="sec-sub">Drag the match state to see the chase win probability update instantly.</p>
+        <div class="field"><label>Target Score <span class="range-val" id="targetVal">175</span></label>
+          <input type="range" id="targetSlider" min="100" max="240" value="175"></div>
+        <div class="field"><label>Current Runs <span class="range-val" id="scoreVal">110</span></label>
+          <input type="range" id="scoreSlider" min="0" max="240" value="110"></div>
+        <div class="field"><label>Wickets Lost <span class="range-val" id="wktVal">3</span></label>
+          <input type="range" id="wktSlider" min="0" max="10" value="3"></div>
+        <div class="field"><label>Overs Bowled <span class="range-val" id="oversVal">13.0</span></label>
+          <input type="range" id="oversSlider" min="0" max="200" value="130"></div>
+      </div>
+      <div class="glass">
+        <h2 class="sec">Chasing Team Win Probability</h2>
+        <div class="gauge-wrap"><svg id="liveGauge" width="260" height="150" viewBox="0 0 260 150"></svg></div>
+        <div class="row3" style="margin-top:10px;">
+          <div class="stat-card"><div class="k">Runs Needed</div><div class="v gold" id="runsNeededOut">—</div></div>
+          <div class="stat-card"><div class="k">Required Rate</div><div class="v cyan" id="rrrOut">—</div></div>
+          <div class="stat-card"><div class="k">Current Rate</div><div class="v" id="crrOut">—</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TAB 3: MATCHUP MATRIX ============ -->
+  <div class="panel" id="panel-matchup">
+    <div class="glass">
+      <h2 class="sec">⚔️ Player Head-to-Head Matrix &amp; Phase Analytics</h2>
+      <p class="sec-sub">Every simulated ball between a batter and bowler, broken down by match phase.</p>
+      <div class="row">
+        <div class="field"><label>Batsman</label><select id="batSelect"></select></div>
+        <div class="field"><label>Bowler</label><select id="bowlSelect"></select></div>
+      </div>
+    </div>
+    <div class="glass" id="matchupStats"></div>
+    <div class="glass"><div class="chart-box"><canvas id="matchupPhaseChart"></canvas></div></div>
+  </div>
+
+  <!-- ============ TAB 4: VISUAL ANALYTICS ============ -->
+  <div class="panel" id="panel-analytics">
+    <div class="glass">
+      <h2 class="sec">📊 Real IPL Dataset Analytics</h2>
+      <p class="sec-sub">These visualizations are calculated directly from <b>data/matches.csv</b> and <b>data/innings.csv</b>.</p>
+      <div class="grid3" id="realDataStats">
+        <div class="stat-card"><div class="k">Matches Loaded</div><div class="v gold" id="realMatches">—</div></div>
+        <div class="stat-card"><div class="k">Innings Loaded</div><div class="v cyan" id="realInnings">—</div></div>
+        <div class="stat-card"><div class="k">Seasons</div><div class="v" id="realSeasons">—</div></div>
+      </div>
+      <p id="realDataStatus" class="empty-note" style="padding-bottom:0;">Loading real dataset...</p>
+    </div>
+
+    <div class="grid2">
+      <div class="glass"><h2 class="sec">Seasonal Performance Balance</h2><p class="sec-sub">See how each season compares with the 50% win baseline.</p><select id="realWinTeamSelect" style="margin-bottom:12px;width:100%;max-width:320px;"></select><div class="chart-box"><canvas id="realWinHeatmap"></canvas></div></div>
+      <div class="glass"><h2 class="sec">Wins by Season</h2><p class="sec-sub">Number of recorded match wins in each season.</p><div class="chart-box"><canvas id="realWinsTrend"></canvas></div></div>
+    </div>
+
+    <div class="grid2">
+      <div class="glass"><h2 class="sec">Runs Distribution by Over Phase</h2><p class="sec-sub">Compare how runs are distributed across the four scoring phases for a selected season.</p><select id="realPhaseSeasonSelect" style="margin-bottom:12px;width:100%;max-width:320px;"></select><div class="chart-box"><canvas id="realRunRateScatter"></canvas></div></div>
+      <div class="glass"><h2 class="sec">Chasing Success by Target</h2><p class="sec-sub">Chase success percentage by first-innings score range.</p><div class="chart-box"><canvas id="realChaseCurve"></canvas></div></div>
+    </div>
+
+    <div class="grid2">
+      <div class="glass"><h2 class="sec">Toss Decision → Match Outcome</h2><p class="sec-sub">See how the toss winner's match outcome changes when choosing to bat or field.</p><select id="realTossSeasonSelect" style="margin-bottom:12px;width:100%;max-width:320px;"></select><div class="chart-box"><canvas id="realTossImpact"></canvas></div></div>
+      <div class="glass"><h2 class="sec">Last Season — 10-Team Scoring Lollipop</h2><p class="sec-sub">Average runs per innings for the 10 teams from the latest season in your dataset.</p><div class="chart-box"><canvas id="realTeamRuns"></canvas></div></div>
+    </div>
+
+    <div class="grid2">
+      <div class="glass"><h2 class="sec">Season Scoring Trend</h2><p class="sec-sub">Average first-innings score by season.</p><div class="chart-box"><canvas id="realSeasonRuns"></canvas></div></div>
+      <div class="glass"><h2 class="sec">Opponent Dominance Radar</h2><p class="sec-sub">Select a team to compare its win percentage against every opponent.</p>
+        <select id="realTeamSelect" style="margin-bottom:12px;"></select>
+        <div class="chart-box tall"><canvas id="realH2H"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TAB 5: VENUE INTELLIGENCE ============ -->
+  <div class="panel" id="panel-venue">
+    <div class="glass">
+      <h2 class="sec">🏟️ Venue Intelligence</h2>
+      <p class="sec-sub">Explore IPL venue trends, scoring patterns, toss impact, and chasing advantage — derived from the same simulated match &amp; ball-by-ball engine that powers the rest of IPL PULSE.</p>
+      <div class="row3">
+        <div class="field"><label>Select Venue</label><select id="venuePickSelect"></select></div>
+        <div class="field"><label>Season Filter</label><select id="venueSeasonFilter"><option value="all">All Seasons</option></select></div>
+        <div class="field"><label>Team Filter</label><select id="venueTeamFilter"><option value="all">All Teams</option></select></div>
+      </div>
+      <button class="btn" id="venueResetBtn" style="width:auto;padding:9px 18px;font-size:12.5px;">↺ RESET FILTERS</button>
+    </div>
+
+    <!-- KPI cards -->
+    <div class="glass">
+      <div class="grid3" id="venueKpiGrid"></div>
+    </div>
+
+    <!-- Charts row 1 -->
+    <div class="grid2">
+      <div class="glass"><h2 class="sec">📈 Average Score by Season</h2><p class="sec-sub" id="venueSeasonSub">Average 1st-innings score at this venue, season by season.</p>
+        <div class="chart-box"><canvas id="venueSeasonChart"></canvas></div></div>
+      <div class="glass"><h2 class="sec">🏏 Bat First vs Chase</h2><p class="sec-sub">Share of matches won by the team batting first vs. the team chasing.</p>
+        <div class="chart-box"><canvas id="venueBatChaseChart"></canvas></div></div>
+    </div>
+
+    <!-- Charts row 2 -->
+    <div class="grid2">
+      <div class="glass"><h2 class="sec">📊 Venue Scoring Distribution</h2><p class="sec-sub">Distribution of 1st-innings totals at this venue.</p>
+        <div class="chart-box"><canvas id="venueDistChart"></canvas></div></div>
+      <div class="glass"><h2 class="sec">🔥 Highest Scores at Venue</h2><p class="sec-sub">Top 10 team totals recorded here.</p>
+        <div class="chart-box tall"><canvas id="venueTopScoresChart"></canvas></div></div>
+    </div>
+
+    <!-- Phase + toss row -->
+    <div class="grid2">
+      <div class="glass"><h2 class="sec">⚡ Powerplay / Death Overs Analysis</h2><p class="sec-sub" id="venuePhaseSub">Average runs per phase, from ball-by-ball data.</p>
+        <div class="chart-box"><canvas id="venuePhaseChart"></canvas></div></div>
+      <div class="glass"><h2 class="sec">🪙 Toss Impact</h2><p class="sec-sub">Does winning the toss actually help at this venue?</p>
+        <div id="venueTossImpact"></div>
+      </div>
+    </div>
+
+    <!-- Venue Insight -->
+    <div class="glass">
+      <h2 class="sec">📌 Venue Insight</h2>
+      <p class="sec-sub" id="venueInsightText" style="color:#eaf0ff;font-size:13.5px;line-height:1.7;"></p>
+    </div>
+
+    <!-- Venue Rating -->
+    <div class="glass">
+      <h2 class="sec">⭐ Venue Rating <button id="venueRatingInfoBtn" class="mono" style="margin-left:auto;background:none;border:1px solid rgba(0,210,255,0.35);color:var(--cyan);border-radius:999px;padding:4px 12px;font-size:11px;cursor:pointer;">How is this calculated?</button></h2>
+      <p class="sec-sub">An analytical score derived from this venue's historical simulated data — not an official IPL rating.</p>
+      <div class="grid2" id="venueRatingGrid"></div>
+      <div id="venueRatingModal" style="display:none;margin-top:14px;padding:16px;background:var(--navy-light);border:1px solid rgba(255,215,0,0.2);border-radius:12px;font-size:12.5px;color:var(--dim);line-height:1.7;"></div>
+    </div>
+
+    <!-- Venue Comparison -->
+    <div class="glass">
+      <h2 class="sec">🏟️ Venue Comparison</h2>
+      <p class="sec-sub">Compare two venues side by side.</p>
+      <div class="row">
+        <div class="field"><label>Venue A</label><select id="venueCompareA"></select></div>
+        <div class="field"><label>Venue B</label><select id="venueCompareB"></select></div>
+      </div>
+      <div id="venueCompareTable"></div>
+    </div>
+  </div>
+
+</div>
+
+<footer>IPL PULSE — synthetic simulation engine · Elo ratings + heuristic in-play model · client-side, no data leaves your browser</footer>
+
+<script>
+/* ============================================================
+   DATA ENGINE — deterministic PRNG so every load is reproducible
+   ============================================================ */
+function mulberry32(seed){
+  return function(){
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rand = mulberry32(42);
+const choice = (arr) => arr[Math.floor(rand()*arr.length)];
+const weightedChoice = (arr, weights) => {
+  const r = rand()*weights.reduce((a,b)=>a+b,0);
+  let acc=0;
+  for(let i=0;i<arr.length;i++){acc+=weights[i]; if(r<=acc) return arr[i];}
+  return arr[arr.length-1];
+};
+const randInt = (min,max) => Math.floor(rand()*(max-min+1))+min;
+
+const TEAM_META = {
+  'Mumbai Indians': {color:'#004BA0', titles:5, abbr:'MI'},
+  'Chennai Super Kings': {color:'#FCCA06', titles:5, abbr:'CSK'},
+  'Royal Challengers Bangalore': {color:'#EC1C24', titles:0, abbr:'RCB'},
+  'Kolkata Knight Riders': {color:'#3A225D', titles:3, abbr:'KKR'},
+  'Sunrisers Hyderabad': {color:'#FF8225', titles:1, abbr:'SRH'},
+  'Delhi Capitals': {color:'#2561AE', titles:0, abbr:'DC'},
+  'Rajasthan Royals': {color:'#EA1B85', titles:1, abbr:'RR'},
+  'Punjab Kings': {color:'#DD1F2D', titles:0, abbr:'PBKS'},
+  'Gujarat Titans': {color:'#5D6472', titles:1, abbr:'GT'},
+  'Lucknow Super Giants': {color:'#0057B8', titles:0, abbr:'LSG'}
+};
+const TEAMS = Object.keys(TEAM_META);
+const VENUES = [
+  'Wankhede Stadium, Mumbai','MA Chidambaram Stadium, Chennai',
+  'M Chinnaswamy Stadium, Bengaluru','Eden Gardens, Kolkata',
+  'Arun Jaitley Stadium, Delhi','Narendra Modi Stadium, Ahmedabad'
+];
+const BATSMEN = ['V Kohli','RG Sharma','S Dhawan','DA Warner','SK Raina','MS Dhoni','AB de Villiers','KL Rahul'];
+const BOWLERS = ['YS Chahal','DJ Bravo','PP Chawla','A Mishra','R Ashwin','B Kumar','SP Narine','JJ Bumrah'];
+const SEASONS = []; for(let y=2008;y<=2023;y++) SEASONS.push(y);
+
+// ---- Generate matches ----
+let matches = [];
+let mid = 1;
+SEASONS.forEach(season=>{
+  for(let i=0;i<50;i++){
+    const shuffled = [...TEAMS].sort(()=>rand()-0.5);
+    const t1 = shuffled[0], t2 = shuffled[1];
+    const tossW = choice([t1,t2]);
+    const tossD = choice(['bat','field']);
+    const winner = weightedChoice([t1,t2],[0.53,0.47]);
+    const venue = choice(VENUES);
+
+    // Batting order derived from the toss: the toss winner either bats or sends the opponent in.
+    const battingFirst = tossD==='bat' ? tossW : (tossW===t1 ? t2 : t1);
+    const battingSecond = battingFirst===t1 ? t2 : t1;
+
+    // First-innings score, then a second-innings score consistent with who actually won.
+    const inns1Score = randInt(120, 220);
+    let inns2Score, winByRuns = 0, winByWkts = 0;
+    if(winner===battingFirst){
+      // defended the total
+      winByRuns = randInt(1, 85);
+      inns2Score = Math.max(55, inns1Score - winByRuns);
+    } else {
+      // successfully chased
+      winByWkts = randInt(1, 10);
+      inns2Score = inns1Score + randInt(1, 25);
+    }
+
+    matches.push({id:mid++, season, team1:t1, team2:t2, toss_winner:tossW, toss_decision:tossD,
+      winner, win_by_runs:winByRuns, win_by_wickets:winByWkts, venue,
+      batting_first:battingFirst, batting_second:battingSecond,
+      inns1_score:inns1Score, inns2_score:inns2Score});
+  }
+});
+
+// ---- Dynamic Elo engine ----
+let eloTracker = {}; TEAMS.forEach(t=>eloTracker[t]=1500);
+let eloHistoryBySeasonTeam = {}; // season -> team -> latest elo that season
+matches.forEach(m=>{
+  m.team1_elo = eloTracker[m.team1];
+  m.team2_elo = eloTracker[m.team2];
+  m.elo_diff = m.team1_elo - m.team2_elo;
+  const e1=m.team1_elo, e2=m.team2_elo;
+  const s1 = m.winner===m.team1 ? 1 : 0;
+  const exp1 = 1/(1+Math.pow(10,(e2-e1)/400));
+  const k=32;
+  eloTracker[m.team1] = e1 + k*(s1-exp1);
+  eloTracker[m.team2] = e2 + k*((1-s1)-(1-exp1));
+  eloHistoryBySeasonTeam[m.season] = eloHistoryBySeasonTeam[m.season] || {};
+  eloHistoryBySeasonTeam[m.season][m.team1] = eloTracker[m.team1];
+  eloHistoryBySeasonTeam[m.season][m.team2] = eloTracker[m.team2];
+});
+
+// ---- Venue chase bias ----
+let venueChaseBias = {};
+VENUES.forEach(v=>{
+  const ms = matches.filter(m=>m.venue===v);
+  const chased = ms.filter(m=>m.win_by_wickets>0).length;
+  venueChaseBias[v] = ms.length ? chased/ms.length : 0.5;
+});
+
+// ---- Ball-by-ball deliveries (sample of matches) ----
+let deliveries = [];
+const sampledMatches = [...matches].sort(()=>rand()-0.5).slice(0,40);
+function assignPhase(over){ return over<=6?'Powerplay': over<=15?'Middle Overs':'Death Overs'; }
+sampledMatches.forEach(m=>{
+  [1,2].forEach(inning=>{
+    const battingTeam = inning===1? m.team1 : m.team2;
+    const bowlingTeam = inning===1? m.team2 : m.team1;
+    for(let over=1;over<=20;over++){
+      for(let ball=1;ball<=6;ball++){
+        const bruns = weightedChoice([0,1,2,4,6],[0.4,0.35,0.1,0.1,0.05]);
+        const wide = rand()<0.04 ? 1 : 0;
+        const dismissalRoll = rand();
+        const dismissalKind = dismissalRoll<0.02?'caught':dismissalRoll<0.03?'bowled':dismissalRoll<0.04?'lbw':null;
+        deliveries.push({
+          match_id:m.id, venue:m.venue, season:m.season, inning, batting_team:battingTeam, bowling_team:bowlingTeam,
+          over, ball, batsman:choice(BATSMEN), bowler:choice(BOWLERS),
+          batsman_runs:bruns, extra_runs:wide, total_runs:bruns+wide,
+          is_wicket: dismissalKind?1:0, is_four: bruns===4?1:0, is_six: bruns===6?1:0,
+          is_dot: (bruns+wide===0)?1:0, phase: assignPhase(over), winner: m.winner
+        });
+      }
+    }
+  });
+});
+
+/* ============================================================
+   PRE-MATCH PREDICTION — Elo + toss/venue contextual adjustment
+   ============================================================ */
+function predictPreMatch(t1,t2,venue,tossW,tossD){
+  const e1 = eloTracker[t1], e2 = eloTracker[t2];
+  let p1 = 1/(1+Math.pow(10,-(e1-e2)/400)); // base elo win prob for t1
+  const bias = venueChaseBias[venue] ?? 0.5;
+  // toss context: fielding first at a high-chase-bias venue is an edge for the team that gets to chase
+  const chaseEdge = (bias-0.5) * 0.30; // magnitude of the effect
+  const tossSign = tossD==='field' ? 1 : -1;
+  if(tossW===t1) p1 += tossSign*chaseEdge;
+  else if(tossW===t2) p1 -= tossSign*chaseEdge;
+  p1 = Math.min(0.94, Math.max(0.06, p1));
+  return {p1: p1*100, p2:(1-p1)*100};
+}
+
+/* ============================================================
+   LIVE IN-PLAY WIN PROBABILITY — heuristic RRR/CRR/wickets model
+   ============================================================ */
+function predictInPlay(target,current,wickets,overs){
+  const ballsBowled = Math.round(overs*6);
+  const ballsRem = Math.max(1,120-ballsBowled);
+  const runsNeeded = Math.max(0,target-current);
+  const wicketsRem = Math.max(0,10-wickets);
+  const rrr = (runsNeeded/ballsRem)*6;
+  const crr = ballsBowled>0 ? (current/ballsBowled)*6 : 0;
+  const logit = 0.55*(crr-rrr) + 0.28*(wicketsRem-5) - 0.018*runsNeeded + 0.35;
+  const prob = 1/(1+Math.exp(-logit));
+  return {prob: Math.min(0.97,Math.max(0.03,prob))*100, runsNeeded, ballsRem, rrr, crr};
+}
+
+/* ============================================================
+   UI — helpers
+   ============================================================ */
+function avatarHTML(team, size){
+  const meta = TEAM_META[team] || {color:'#666', abbr:'??'};
+  return `<div class="avatar" style="background:${meta.color};${size?`width:${size}px;height:${size}px;`:''}">${meta.abbr}</div>`;
+}
+function populateSelect(sel, options, selectedVal){
+  sel.innerHTML = options.map(o=>`<option value="${o}" ${o===selectedVal?'selected':''}>${o}</option>`).join('');
+}
+
+// Tabs
+document.querySelectorAll('.tabbtn').forEach((btn,i)=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.tabbtn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+  });
+});
+document.querySelectorAll('.tabbtn')[0].classList.add('active');
+document.querySelectorAll('.panel')[0].classList.add('active');
+
+// Hero stats
+document.getElementById('statSeasons').textContent = SEASONS.length;
+document.getElementById('statMatches').textContent = matches.length;
+document.getElementById('statBalls').textContent = deliveries.length.toLocaleString();
+
+/* ---------------- Gauge (floodlight arc) ---------------- */
+function drawGauge(svgEl, value){ // value 0-100
+  const cx=130, cy=130, r=100;
+  const startAngle = Math.PI, endAngle = 0; // semicircle top
+  const frac = value/100;
+  const angle = startAngle - frac*(startAngle-endAngle);
+  const x1 = cx + r*Math.cos(startAngle), y1 = cy + r*Math.sin(startAngle);
+  const x2 = cx + r*Math.cos(endAngle), y2 = cy + r*Math.sin(endAngle);
+  const xv = cx + r*Math.cos(angle), yv = cy + r*Math.sin(angle);
+  const color = value>=50 ? '#00e676' : '#ff5470';
+  const largeArc = 0;
+  svgEl.innerHTML = `
+    <path d="M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}" fill="none" stroke="#1c2c4a" stroke-width="16" stroke-linecap="round"/>
+    <path d="M ${x1} ${y1} A ${r} ${r} 0 ${frac>0.5?1:0} 1 ${xv} ${yv}" fill="none" stroke="${color}" stroke-width="16" stroke-linecap="round" style="filter:drop-shadow(0 0 8px ${color}99)"/>
+    <circle cx="${cx}" cy="${cy}" r="4" fill="${color}"/>
+    <line x1="${cx}" y1="${cy}" x2="${xv}" y2="${yv}" stroke="${color}" stroke-width="3" stroke-linecap="round"/>
+    <text x="${cx}" y="${cy-14}" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="30" font-weight="700" fill="#fff">${value.toFixed(1)}%</text>
+    <text x="${cx}" y="${cy+8}" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" fill="#8892b0" letter-spacing="1">WIN PROBABILITY</text>
+  `;
+}
+
+/* ---------------- TAB 1: Pre-match ---------------- */
+const t1Select = document.getElementById('t1Select');
+const t2Select = document.getElementById('t2Select');
+const venueSelect = document.getElementById('venueSelect');
+const tossWSelect = document.getElementById('tossWSelect');
+const tossDSelect = document.getElementById('tossDSelect');
+
+populateSelect(t1Select, TEAMS, 'Mumbai Indians');
+populateSelect(t2Select, TEAMS, 'Chennai Super Kings');
+populateSelect(venueSelect, VENUES);
+function refreshTossOptions(){ populateSelect(tossWSelect, [t1Select.value, t2Select.value]); }
+refreshTossOptions();
+t1Select.addEventListener('change', refreshTossOptions);
+t2Select.addEventListener('change', refreshTossOptions);
+
+document.getElementById('runPredictBtn').addEventListener('click', ()=>{
+  const t1=t1Select.value, t2=t2Select.value, venue=venueSelect.value, tossW=tossWSelect.value, tossD=tossDSelect.value;
+  const resBox = document.getElementById('predictResult');
+  if(t1===t2){
+    resBox.style.display='block';
+    resBox.innerHTML = `<p class="empty-note">Pick two different teams to run a prediction.</p>`;
+    return;
+  }
+  const {p1,p2} = predictPreMatch(t1,t2,venue,tossW,tossD);
+  const winner = p1>=p2 ? t1 : t2;
+  const conf = Math.max(p1,p2);
+  const tag = conf>=70 ? '🔥 Strong Favourite' : conf>=55 ? '⚔ Balanced Match' : '🛡️ Tough Competition';
+  resBox.style.display='block';
+  resBox.innerHTML = `
+    <h2 class="sec" style="justify-content:center;">🏆 Predicted Winner: <span style="color:var(--gold)">${winner}</span></h2>
+    <p class="sec-sub" style="text-align:center;">Confidence: <b class="mono" style="color:#fff">${conf.toFixed(1)}%</b> — ${tag}</p>
+    <div class="team-vs">
+      <div class="team-chip">${avatarHTML(t1)}<span>${t1}</span></div>
+      <span class="mono" style="color:var(--gold)">${p1.toFixed(1)}%</span>
+    </div>
+    <div class="split-bar"><div class="split-seg" style="width:${p1}%;background:${TEAM_META[t1].color}"></div><div class="split-seg" style="width:${p2}%;background:${TEAM_META[t2].color}"></div></div>
+    <div class="team-vs" style="margin-top:8px;">
+      <div class="team-chip">${avatarHTML(t2)}<span>${t2}</span></div>
+      <span class="mono" style="color:var(--gold)">${p2.toFixed(1)}%</span>
+    </div>
+    <p style="font-size:11.5px;color:var(--dim2);text-align:center;margin-top:16px;">Elo(${t1}): ${eloTracker[t1].toFixed(0)} · Elo(${t2}): ${eloTracker[t2].toFixed(0)} · Venue chase bias: ${(venueChaseBias[venue]*100).toFixed(0)}%</p>
+  `;
+});
+
+/* ---------------- TAB 2: Live in-play ---------------- */
+const targetSlider=document.getElementById('targetSlider'), scoreSlider=document.getElementById('scoreSlider'),
+      wktSlider=document.getElementById('wktSlider'), oversSlider=document.getElementById('oversSlider');
+const liveGauge = document.getElementById('liveGauge');
+
+function updateLive(){
+  const target=+targetSlider.value, current=+scoreSlider.value, wkts=+wktSlider.value, overs=(+oversSlider.value)/10;
+  document.getElementById('targetVal').textContent=target;
+  document.getElementById('scoreVal').textContent=current;
+  document.getElementById('wktVal').textContent=wkts;
+  document.getElementById('oversVal').textContent=overs.toFixed(1);
+  const r = predictInPlay(target,current,wkts,overs);
+  drawGauge(liveGauge, r.prob);
+  document.getElementById('runsNeededOut').textContent = r.runsNeeded + ' / ' + r.ballsRem + 'b';
+  document.getElementById('rrrOut').textContent = r.rrr.toFixed(2);
+  document.getElementById('crrOut').textContent = r.crr.toFixed(2);
+}
+[targetSlider,scoreSlider,wktSlider,oversSlider].forEach(s=>s.addEventListener('input',updateLive));
+updateLive();
+
+/* ---------------- TAB 3: Matchup matrix ---------------- */
+const batSelect=document.getElementById('batSelect'), bowlSelect=document.getElementById('bowlSelect');
+populateSelect(batSelect, BATSMEN, 'V Kohli');
+populateSelect(bowlSelect, BOWLERS, 'JJ Bumrah');
+let phaseChart=null;
+
+function renderMatchup(){
+  const bat=batSelect.value, bowl=bowlSelect.value;
+  const balls = deliveries.filter(d=>d.batsman===bat && d.bowler===bowl);
+  const statsBox = document.getElementById('matchupStats');
+  if(balls.length===0){
+    statsBox.innerHTML = `<p class="empty-note">No recorded encounters between ${bat} and ${bowl} yet.</p>`;
+    if(phaseChart){phaseChart.destroy();phaseChart=null;}
+    return;
+  }
+  const runs = balls.reduce((a,d)=>a+d.batsman_runs,0);
+  const wkts = balls.reduce((a,d)=>a+d.is_wicket,0);
+  const dots = balls.reduce((a,d)=>a+d.is_dot,0);
+  const fours = balls.reduce((a,d)=>a+d.is_four,0);
+  const sixes = balls.reduce((a,d)=>a+d.is_six,0);
+  const sr = balls.length ? (runs/balls.length*100) : 0;
+  const dotPct = balls.length ? (dots/balls.length*100) : 0;
+  statsBox.innerHTML = `
+    <h2 class="sec">⚔️ ${bat} vs ${bowl}</h2>
+    <div class="grid3">
+      <div class="stat-card"><div class="k">Runs Scored</div><div class="v gold">${runs}</div></div>
+      <div class="stat-card"><div class="k">Balls Faced</div><div class="v">${balls.length}</div></div>
+      <div class="stat-card"><div class="k">Dismissals</div><div class="v red">${wkts}</div></div>
+      <div class="stat-card"><div class="k">Strike Rate</div><div class="v">${sr.toFixed(1)}</div></div>
+      <div class="stat-card"><div class="k">Dot Ball %</div><div class="v cyan">${dotPct.toFixed(1)}%</div></div>
+      <div class="stat-card"><div class="k">Boundaries (4s/6s)</div><div class="v">${fours} / ${sixes}</div></div>
+    </div>`;
+
+  const phases=['Powerplay','Middle Overs','Death Overs'];
+  const phaseRuns = phases.map(p=>balls.filter(d=>d.phase===p).reduce((a,d)=>a+d.batsman_runs,0));
+  const ctx = document.getElementById('matchupPhaseChart').getContext('2d');
+  if(phaseChart) phaseChart.destroy();
+  phaseChart = new Chart(ctx,{
+    type:'bar',
+    data:{labels:phases, datasets:[{label:'Runs', data:phaseRuns, backgroundColor:['#FFD700','#00d2ff','#8a5cff'], borderRadius:8}]},
+    options: chartOpts('Runs scored by phase')
+  });
+}
+batSelect.addEventListener('change',renderMatchup);
+bowlSelect.addEventListener('change',renderMatchup);
+
+/* ---------------- Chart.js shared options ---------------- */
+function chartOpts(title){
+  return {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{
+      legend:{display:false},
+      title:{display:!!title, text:title, color:'#8892b0', font:{family:'Inter',size:12}}
+    },
+    scales:{
+      x:{ticks:{color:'#8892b0'}, grid:{color:'rgba(255,255,255,0.05)'}},
+      y:{ticks:{color:'#8892b0'}, grid:{color:'rgba(255,255,255,0.05)'}, beginAtZero:true}
+    }
+  };
+}
+
+/* ---------------- TAB 4: Visual analytics ---------------- */
+function renderAnalytics(){
+  // The original dashboard used generated/simulated data here. This section
+  // now loads the user's real CSV files for the Visual Analytics tab only.
+  loadRealAnalytics();
+}
+
+let realMatches=[], realInnings=[], realDeliveries=[];
+const realCharts={};
+
+function loadRealCSV(path){
+  return new Promise((resolve,reject)=>{
+    Papa.parse(path,{download:true,header:true,dynamicTyping:true,skipEmptyLines:true,
+      complete:r=>resolve(r.data),error:e=>reject(e)});
+  });
+}
+function rv(v){const n=Number(v);return Number.isFinite(n)?n:0;}
+function rpct(a,b){return b ? 100*a/b : 0;}
+function rseason(m){return String(m.season_year ?? m.season ?? m.year ?? 'Unknown');}
+function rteam(m,key){return m[key] ?? m[key.replace('_name','')] ?? '';}
+function rwinner(m){return m.winner_name ?? m.winner ?? '';}
+function rmatchId(m){return String(m.match_id ?? m.id ?? m.matchId ?? '');}
+function findInningsMatch(i){return realMatches.find(m=>rmatchId(m)===String(i.match_id ?? i.id ?? ''));}
+function destroyReal(id){if(realCharts[id]){realCharts[id].destroy();delete realCharts[id];}}
+
+const realChartOpts={responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{labels:{color:'#dce4f5'}}},
+  scales:{x:{ticks:{color:'#9ca8bd'},grid:{color:'rgba(255,255,255,0.05)'}},
+          y:{ticks:{color:'#9ca8bd'},grid:{color:'rgba(255,255,255,0.05)'},beginAtZero:true}}};
+
+async function loadRealAnalytics(){
+  const status=document.getElementById('realDataStatus');
+  try{
+    [realMatches,realInnings]=await Promise.all([
+      loadRealCSV('data/matches.csv'),loadRealCSV('data/innings.csv')
+    ]);
+    realMatches=realMatches.filter(m=>m && Object.keys(m).length>1);
+    realInnings=realInnings.filter(i=>i && Object.keys(i).length>1 && String(i.is_super_over ?? '').toLowerCase()!=='true' && String(i.is_super_over ?? '')!=='1');
+    try{
+      realDeliveries=await loadRealCSV('data/deliveries.csv');
+      realDeliveries=realDeliveries.filter(d=>d && Object.keys(d).length>1 && String(d.is_super_over ?? '').toLowerCase()!=='true' && String(d.is_super_over ?? '')!=='1');
+    }catch(_){ realDeliveries=[]; }
+    document.getElementById('realMatches').textContent=realMatches.length.toLocaleString();
+    document.getElementById('realInnings').textContent=realInnings.length.toLocaleString();
+    document.getElementById('realSeasons').textContent=[...new Set(realMatches.map(rseason))].filter(x=>x!=='Unknown').length;
+    status.textContent='Real CSV data loaded successfully.';
+    renderRealAnalytics();
+  }catch(e){
+    status.innerHTML='Could not load the real CSV files. Keep <b>matches.csv</b> and <b>innings.csv</b> inside the dashboard <b>data</b> folder and run the dashboard through a local server.';
+    console.error(e);
+  }
+}
+
+function renderRealAnalytics(){
+  realTeamWinSeason();realWinsTrend();realRunRateScatter();realChaseCurve();realTossImpact();realTeamRuns();realSeasonRuns();setupRealH2H();
+}
+
+function realTeamWinSeason(){
+  const seasons=[...new Set(realMatches.map(rseason))].filter(x=>x!=='Unknown').sort((a,b)=>Number(a)-Number(b));
+  const teams=[...new Set(realMatches.flatMap(m=>[rteam(m,'team1_name'),rteam(m,'team2_name')]).filter(Boolean))].sort();
+  const stats={};
+  teams.forEach(t=>stats[t]={});
+  realMatches.forEach(m=>{
+    const s=rseason(m),w=rwinner(m);
+    [rteam(m,'team1_name'),rteam(m,'team2_name')].forEach(t=>{
+      if(!stats[t])return;
+      stats[t][s]??={m:0,w:0};
+      stats[t][s].m++;
+      if(w===t)stats[t][s].w++;
+    });
+  });
+
+  const select=document.getElementById('realWinTeamSelect');
+  const previous=select.value;
+  select.innerHTML=teams.map(t=>`<option value="${t.replace(/"/g,'&quot;')}">${t}</option>`).join('');
+  if(previous && teams.includes(previous)) select.value=previous;
+  else if(teams.includes('Chennai Super Kings')) select.value='Chennai Super Kings';
+  else select.value=teams[0]||'';
+  select.onchange=()=>renderSelectedTeamWinChart(seasons,stats,select.value);
+  renderSelectedTeamWinChart(seasons,stats,select.value);
+}
+
+function renderSelectedTeamWinChart(seasons,stats,team){
+  const winValues=seasons.map(s=>stats[team]?.[s]?rpct(stats[team][s].w,stats[team][s].m):null);
+  const deviations=winValues.map(v=>v===null?null:v-50);
+  destroyReal('heat');
+  realCharts.heat=new Chart(document.getElementById('realWinHeatmap'),{
+    type:'bar',
+    data:{labels:seasons,datasets:[{
+      label:`${team} vs 50% baseline`,
+      data:deviations,
+      backgroundColor:deviations.map(v=>v===null?'rgba(120,130,150,.2)':v>=0?'rgba(42,190,126,.82)':'rgba(255,88,88,.78)'),
+      borderColor:deviations.map(v=>v===null?'rgba(120,130,150,.2)':v>=0?'#2abe7e':'#ff5858'),
+      borderWidth:1,
+      borderRadius:5,
+      barPercentage:.72,
+      categoryPercentage:.82
+    }]},
+    options:{...realChartOpts,
+      plugins:{...realChartOpts.plugins,
+        legend:{display:true,labels:{color:'#dce4f5'}},
+        tooltip:{...realChartOpts.plugins.tooltip,callbacks:{label:ctx=>{
+          const v=winValues[ctx.dataIndex];
+          return v===null?' No recorded matches':` Win rate: ${v.toFixed(1)}%`;
+        }}}
+      },
+      scales:{
+        x:{...realChartOpts.scales.x,title:{display:true,text:'Season',color:'#dce4f5'}},
+        y:{...realChartOpts.scales.y,min:-50,max:50,title:{display:true,text:'Difference from 50% baseline',color:'#dce4f5'},ticks:{...realChartOpts.scales.y.ticks,callback:v=>v>0?'+'+v+'%':v+'%'},grid:{...realChartOpts.scales.y.grid,color:ctx=>ctx.tick.value===0?'rgba(255,215,0,.8)':'rgba(255,255,255,.07)'}}
+      }
+    }
+  });
+}
+
+function realWinsTrend(){
+  const d={};realMatches.forEach(m=>{const s=rseason(m);if(rwinner(m))d[s]=(d[s]||0)+1;});
+  const labels=Object.keys(d).sort((a,b)=>Number(a)-Number(b));destroyReal('wins');
+  realCharts.wins=new Chart(document.getElementById('realWinsTrend'),{type:'line',data:{labels,datasets:[{label:'Recorded wins',data:labels.map(s=>d[s]),borderColor:'#FFD700',backgroundColor:'rgba(255,215,0,.12)',fill:true,tension:.25}]},options:realChartOpts});
+}
+
+function inningsBalls(i){
+  const direct=rv(i.legal_balls ?? i.legal_balls_bowled ?? i.total_balls ?? i.balls ?? i.balls_bowled ?? i.legal_deliveries ?? i.num_balls);
+  if(direct>0)return direct;
+  const ov=i.overs ?? i.overs_bowled ?? i.total_overs;
+  if(ov!==undefined && ov!==null && String(ov).trim()!==''){
+    const n=Number(ov);
+    if(Number.isFinite(n)){
+      const whole=Math.floor(n), part=Math.round((n-whole)*10);
+      return whole*6+Math.min(part,5);
+    }
+  }
+  return 0;
+}
+
+function realRunRateScatter(){
+  const select=document.getElementById('realPhaseSeasonSelect');
+  const phaseBox=document.getElementById('realRunRateScatter').parentElement;
+  const canvas=document.getElementById('realRunRateScatter');
+  const matchMap=new Map(realMatches.map(m=>[String(m.match_id ?? m.id ?? m.matchId ?? '').trim(),m]));
+  const getSeason=d=>{
+    const direct=d.season_year ?? d.season ?? d.year;
+    if(direct!==undefined && direct!==null && String(direct).trim()!=='') return String(direct).trim();
+    const m=matchMap.get(String(d.match_id ?? d.matchId ?? d.id ?? '').trim());
+    return m ? String(m.season_year ?? m.season ?? m.year ?? 'Unknown').trim() : 'Unknown';
+  };
+  const seasons=[...new Set(realMatches.map(m=>String(m.season_year ?? m.season ?? m.year ?? '').trim()).filter(Boolean))]
+    .sort((a,b)=>Number(a)-Number(b));
+  select.innerHTML=seasons.length ? seasons.map(s=>`<option value="${s}">${s}</option>`).join('') : '<option value="">No seasons found</option>';
+  if(seasons.includes('2008')) select.value='2008';
+
+  const removeMessage=()=>{const x=phaseBox.querySelector('.phase-empty-msg');if(x)x.remove();};
+  const showMessage=(html)=>{
+    removeMessage(); canvas.style.display='none';
+    const msg=document.createElement('div'); msg.className='phase-empty-msg empty-note';
+    msg.style.cssText='height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:30px;';
+    msg.innerHTML=html; phaseBox.appendChild(msg);
+  };
+
+  const draw=()=>{
+    destroyReal('scatter'); removeMessage(); canvas.style.display='block';
+    const season=select.value;
+    if(!realDeliveries.length){
+      showMessage('<div><b>deliveries.csv was not loaded.</b><br>Keep it inside <b>data/deliveries.csv</b> and run the dashboard with a local server.</div>');
+      return;
+    }
+    const rows=realDeliveries.filter(d=>!d.is_super_over && getSeason(d)===season);
+    if(!rows.length){
+      showMessage(`<div><b>No delivery records found for ${season}.</b></div>`); return;
+    }
+    // The supplied deliveries.csv uses over 0–19 and runs_total.
+    const phaseDefs=[['0–5',0,5],['6–10',6,10],['11–15',11,15],['16–20',16,19]];
+    const phaseRuns=phaseDefs.map(([label,lo,hi])=>rows.reduce((sum,d)=>{
+      const over=Number(d.over);
+      return sum+(Number.isFinite(over)&&over>=lo&&over<=hi ? Number(d.runs_total)||0 : 0);
+    },0));
+    const phaseBalls=phaseDefs.map(([label,lo,hi])=>rows.reduce((sum,d)=>{
+      const over=Number(d.over);
+      return sum+(Number.isFinite(over)&&over>=lo&&over<=hi && (d.is_legal_ball===true || String(d.is_legal_ball).toLowerCase()==='true' || Number(d.is_legal_ball)===1) ? 1 : 0);
+    },0));
+    const inningsCount=new Set(rows.map(d=>`${d.match_id}-${d.innings_no}`)).size;
+    realCharts.scatter=new Chart(canvas,{
+      type:'bar',
+      data:{labels:phaseDefs.map(x=>x[0]),datasets:[{
+        label:`Runs in ${season}`,
+        data:phaseRuns,
+        backgroundColor:['#FFD700','#00d2ff','#8a5cff','#ff5c8a'],
+        borderRadius:8,
+        maxBarThickness:70
+      }]},
+      options:{
+        ...realChartOpts,
+        plugins:{...realChartOpts.plugins,legend:{display:true,labels:{color:'#dce4f5'}},
+          tooltip:{callbacks:{label:c=>` ${c.raw.toLocaleString()} runs`}}},
+        scales:{
+          x:{...realChartOpts.scales.x,title:{display:true,text:'Over phase',color:'#dce4f5'}},
+          y:{...realChartOpts.scales.y,beginAtZero:true,title:{display:true,text:'Total runs',color:'#dce4f5'},suggestedMax:Math.max(...phaseRuns)*1.15}
+        }
+      }
+    });
+    const subtitle=phaseBox.parentElement.querySelector('.sec-sub');
+    if(subtitle) subtitle.textContent=`Total runs scored in each 5-over phase for ${season} (${inningsCount.toLocaleString()} innings).`;
+  };
+  select.onchange=draw;
+  draw();
+}
+function realChaseCurve(){
+  const buckets=[['1–120',1,120],['121–140',121,140],['141–160',141,160],['161–180',161,180],['181–200',181,200],['201+',201,Infinity]];
+  const vals=buckets.map(b=>{let total=0,success=0;realMatches.forEach(m=>{const first=realInnings.find(i=>rmatchId(i)===rmatchId(m) && rv(i.innings_no ?? i.inning ?? i.innings)===1);if(!first)return;const score=rv(first.total_runs ?? first.runs ?? first.total_score);if(score<b[1]||score>b[2])return;total++;const wkt=rv(m.win_by_wickets ?? m.win_wickets ?? m.wickets);if(wkt>0)success++;});return rpct(success,total);});
+  destroyReal('chase');realCharts.chase=new Chart(document.getElementById('realChaseCurve'),{type:'line',data:{labels:buckets.map(b=>b[0]),datasets:[{label:'Chase success %',data:vals,borderColor:'#00d2ff',backgroundColor:'rgba(0,210,255,.10)',fill:true,tension:.3}]},options:{...realChartOpts,scales:{x:realChartOpts.scales.x,y:{...realChartOpts.scales.y,min:0,max:100,title:{display:true,text:'Success %',color:'#dce4f5'}}}}});
+}
+
+function realTossImpact(){
+  const select=document.getElementById('realTossSeasonSelect');
+  const seasons=[...new Set(realMatches.map(rseason))].filter(x=>x!=='Unknown').sort((a,b)=>Number(a)-Number(b));
+  const previous=select.value;
+  select.innerHTML='<option value="all">All Seasons</option>'+seasons.map(s=>`<option value="${s}">${s}</option>`).join('');
+  if(previous && [...select.options].some(o=>o.value===previous)) select.value=previous;
+  else select.value='all';
+
+  const draw=()=>{
+    const selected=select.value;
+    const ms=selected==='all'?realMatches:realMatches.filter(m=>rseason(m)===selected);
+    const groups={bat:{n:0,w:0},field:{n:0,w:0}};
+    ms.forEach(m=>{
+      const d=String(m.toss_decision??'').trim().toLowerCase();
+      if(!groups[d])return;
+      groups[d].n++;
+      const toss=String(m.toss_winner??m.toss_winner_name??'').trim().toLowerCase();
+      const winner=String(m.winner??'').trim().toLowerCase();
+      const winnerName=String(m.winner_name??'').trim().toLowerCase();
+      if(toss && (toss===winner || toss===winnerName)) groups[d].w++;
+    });
+    const batWin=rpct(groups.bat.w,groups.bat.n), fieldWin=rpct(groups.field.w,groups.field.n);
+    const batLoss=100-batWin, fieldLoss=100-fieldWin;
+    destroyReal('toss');
+    realCharts.toss=new Chart(document.getElementById('realTossImpact'),{
+      type:'bar',
+      data:{
+        labels:['Chose to Bat','Chose to Field'],
+        datasets:[
+          {label:'Toss winner won match',data:[batWin,fieldWin],backgroundColor:'#FFD700',borderRadius:6},
+          {label:'Toss winner lost match',data:[batLoss,fieldLoss],backgroundColor:'#334155',borderRadius:6}
+        ]
+      },
+      options:{
+        ...realChartOpts,
+        plugins:{...realChartOpts.plugins,legend:{display:true,labels:{color:'#dce4f5'}}},
+        scales:{
+          x:{...realChartOpts.scales.x,stacked:true},
+          y:{...realChartOpts.scales.y,stacked:true,min:0,max:100,title:{display:true,text:'Share of matches (%)',color:'#dce4f5'}}
+        }
+      }
+    });
+    const subtitle=select.parentElement.querySelector('.sec-sub');
+    if(subtitle) subtitle.textContent=selected==='all'?'Toss winner outcome split by toss decision across all seasons.':`Toss winner outcome split for the ${selected} season.`;
+  };
+  select.onchange=draw;
+  draw();
+}
+function realTeamRuns(){
+  const seasons=[...new Set(realMatches.map(rseason))].filter(x=>x!=='Unknown').sort((a,b)=>Number(a)-Number(b));
+  const lastSeason=seasons[seasons.length-1];
+  const validMatchIds=new Set(realMatches.filter(m=>rseason(m)===lastSeason).map(rmatchId));
+  const d={};
+  realInnings.forEach(i=>{
+    const mid=rmatchId(i);
+    if(!validMatchIds.has(mid))return;
+    const team=String(i.batting_team_name??i.batting_team??i.team??'').trim();
+    if(!team)return;
+    const runs=rv(i.total_runs??i.runs??i.total_score);
+    if(!d[team])d[team]={total:0,n:0};
+    d[team].total+=runs;
+    d[team].n++;
+  });
+  const rows=Object.entries(d)
+    .map(([team,v])=>({team,avg:v.n?v.total/v.n:0,innings:v.n}))
+    .sort((a,b)=>b.avg-a.avg)
+    .slice(0,10);
+
+  destroyReal('teamRuns');
+  const ctx=document.getElementById('realTeamRuns').getContext('2d');
+  const stemPlugin={
+    id:'teamScoreLollipopStems',
+    afterDatasetsDraw(chart){
+      const {ctx,scales:{x,y}}=chart;
+      ctx.save();
+      ctx.strokeStyle='#8a5cff';
+      ctx.lineWidth=3;
+      rows.forEach((r,i)=>{
+        const px=x.getPixelForValue(i);
+        const py=y.getPixelForValue(r.avg);
+        const base=y.getPixelForValue(0);
+        ctx.beginPath();
+        ctx.moveTo(px,base);
+        ctx.lineTo(px,py);
+        ctx.stroke();
+      });
+      ctx.restore();
+    }
+  };
+
+  realCharts.teamRuns=new Chart(ctx,{
+    type:'line',
+    plugins:[stemPlugin],
+    data:{
+      datasets:[{
+        label:'Average score',
+        data:rows.map((r,i)=>({x:i,y:r.avg})),
+        borderColor:'rgba(0,0,0,0)',
+        backgroundColor:'#FFD700',
+        pointBackgroundColor:'#FFD700',
+        pointBorderColor:'#FFD700',
+        pointRadius:8,
+        pointHoverRadius:11,
+        showLine:false
+      }]
+    },
+    options:{
+      ...realChartOpts,
+      plugins:{...realChartOpts.plugins,legend:{display:false},tooltip:{callbacks:{
+        title:items=>rows[items[0]?.dataIndex]?.team||'',
+        label:c=>{
+          const r=rows[c.dataIndex];
+          return `Average: ${r.avg.toFixed(1)} runs | Innings: ${r.innings}`;
+        }
+      }}},
+      scales:{
+        x:{
+          type:'linear',
+          min:-0.5,
+          max:rows.length-0.5,
+          ticks:{
+            color:'#9ca8bd',
+            stepSize:1,
+            autoSkip:false,
+            maxRotation:60,
+            minRotation:60,
+            font:{size:9},
+            callback:value=>rows[Math.round(value)]?.team||''
+          },
+          grid:{color:'rgba(255,255,255,0.05)'},
+          title:{display:true,text:'Team',color:'#dce4f5'}
+        },
+        y:{...realChartOpts.scales.y,min:0,title:{display:true,text:'Average score',color:'#dce4f5'}}
+      }
+    }
+  });
+  const card=document.querySelector('#realTeamRuns')?.closest('.glass');
+  const title=card?.querySelector('.sec');
+  const subtitle=card?.querySelector('.sec-sub');
+  if(title) title.textContent=`Average score of team year-${lastSeason}`;
+  if(subtitle) subtitle.textContent=`Average score per innings for the 10 teams in ${lastSeason}.`;
+}
+function realSeasonRuns(){
+  const d={};realInnings.forEach(i=>{if(rv(i.innings_no ?? i.inning ?? i.innings)!==1)return;const m=findInningsMatch(i);if(!m)return;const s=rseason(m);(d[s]??={r:0,n:0});d[s].r+=rv(i.total_runs??i.runs??i.total_score);d[s].n++;});
+  const labels=Object.keys(d).sort((a,b)=>Number(a)-Number(b));destroyReal('season');realCharts.season=new Chart(document.getElementById('realSeasonRuns'),{type:'line',data:{labels,datasets:[{label:'Average first-innings score',data:labels.map(s=>d[s].r/d[s].n),borderColor:'#00e676',backgroundColor:'rgba(0,230,118,.10)',fill:true,tension:.25}]},options:realChartOpts});
+}
+
+function setupRealH2H(){
+  const teams=[...new Set(
+    realMatches.flatMap(m=>[
+      rteam(m,'team1_name'),
+      rteam(m,'team2_name')
+    ]).filter(Boolean)
+  )].sort();
+
+  const sel=document.getElementById('realTeamSelect');
+  const previous=sel.value;
+
+  sel.innerHTML=teams.map(t=>`<option value="${t.replace(/"/g,'&quot;')}">${t}</option>`).join('');
+
+  if(previous && teams.includes(previous)) sel.value=previous;
+  else if(teams.includes('Delhi Capitals')) sel.value='Delhi Capitals';
+  else if(teams.length) sel.value=teams[0];
+
+  sel.onchange=renderRealH2H;
+  renderRealH2H();
+}
+
+function renderRealH2H(){
+  const team=document.getElementById('realTeamSelect').value;
+  const stats={};
+
+  realMatches.forEach(m=>{
+    const a=String(rteam(m,'team1_name')||'').trim();
+    const b=String(rteam(m,'team2_name')||'').trim();
+
+    if(a!==team && b!==team) return;
+
+    const opp=a===team ? b : a;
+    if(!opp || opp===team) return;
+
+    if(!stats[opp]) stats[opp]={matches:0,wins:0};
+
+    stats[opp].matches++;
+
+    const winner=String(rwinner(m)||'').trim();
+    if(winner===team) stats[opp].wins++;
+  });
+
+  const rows=Object.entries(stats)
+    .map(([opponent,v])=>({
+      opponent,
+      matches:v.matches,
+      wins:v.wins,
+      winPct:v.matches ? (v.wins/v.matches)*100 : 0
+    }))
+    .sort((a,b)=>b.winPct-a.winPct);
+
+  destroyReal('h2h');
+
+  const canvas=document.getElementById('realH2H');
+  const ctx=canvas.getContext('2d');
+
+  realCharts.h2h=new Chart(ctx,{
+    type:'radar',
+    data:{
+      labels:rows.map(r=>r.opponent),
+      datasets:[{
+        label:`${team} Win %`,
+        data:rows.map(r=>r.winPct),
+        backgroundColor:'rgba(255,215,0,0.16)',
+        borderColor:'#FFD700',
+        pointBackgroundColor:'#FFD700',
+        pointBorderColor:'#ffffff',
+        pointHoverBackgroundColor:'#ffffff',
+        pointHoverBorderColor:'#FFD700',
+        borderWidth:2.5,
+        pointRadius:5,
+        pointHoverRadius:7
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      scales:{
+        r:{
+          min:0,
+          max:100,
+          beginAtZero:true,
+          ticks:{
+            stepSize:20,
+            color:'#9ca8bd',
+            backdropColor:'transparent',
+            callback:value=>`${value}%`
+          },
+          grid:{
+            color:'rgba(255,255,255,0.09)'
+          },
+          angleLines:{
+            color:'rgba(255,255,255,0.09)'
+          },
+          pointLabels:{
+            color:'#dce4f5',
+            font:{
+              family:'Inter',
+              size:10.5,
+              weight:'600'
+            }
+          }
+        }
+      },
+      plugins:{
+        legend:{
+          display:true,
+          labels:{
+            color:'#dce4f5'
+          }
+        },
+        tooltip:{
+          callbacks:{
+            title:items=>rows[items[0]?.dataIndex]?.opponent||'',
+            label:context=>{
+              const r=rows[context.dataIndex];
+              return [
+                `Win %: ${r.winPct.toFixed(1)}%`,
+                `Wins: ${r.wins}`,
+                `Matches: ${r.matches}`
+              ];
+            }
+          }
+        }
+      }
+    }
+  });
+
+  const card=canvas.closest('.glass');
+  const subtitle=card?.querySelector('.sec-sub');
+  if(subtitle){
+    subtitle.textContent=
+      `${team}: win percentage against ${rows.length} recorded opponents.`;
+  }
+}
+
+/* ---------------- TAB 5: Venue Intelligence ---------------- */
+const venuePickSelect = document.getElementById('venuePickSelect');
+const venueSeasonFilter = document.getElementById('venueSeasonFilter');
+const venueTeamFilter = document.getElementById('venueTeamFilter');
+const venueCompareA = document.getElementById('venueCompareA');
+const venueCompareB = document.getElementById('venueCompareB');
+
+populateSelect(venuePickSelect, VENUES);
+populateSelect(venueCompareA, VENUES, VENUES[0]);
+populateSelect(venueCompareB, VENUES, VENUES[1]);
+// season/team filters keep their "All" option, so append rather than replace
+SEASONS.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; venueSeasonFilter.appendChild(o); });
+TEAMS.forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; venueTeamFilter.appendChild(o); });
+
+function mean(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
+function starsHTML(n){ n=Math.max(1,Math.min(5,Math.round(n))); return '⭐'.repeat(n)+'☆'.repeat(5-n); }
+
+function matchesForVenue(venue, season, team){
+  return matches.filter(m=>
+    m.venue===venue &&
+    (season==='all' || String(m.season)===String(season)) &&
+    (team==='all' || m.team1===team || m.team2===team)
+  );
+}
+
+// Global baselines across every venue, used to calibrate the star rating
+const GLOBAL_AVG_SCORE = mean(matches.flatMap(m=>[m.inns1_score, m.inns2_score]));
+const GLOBAL_HIGH_SCORE_RATE = matches.flatMap(m=>[m.inns1_score, m.inns2_score]).filter(s=>s>=180).length / (matches.length*2);
+
+function venueKpis(ms){
+  if(!ms.length){
+    return {matches:0, avg1:0, avg2:0, high:0, low:0, batFirstWinPct:0, chaseWinPct:0};
+  }
+  const inns1 = ms.map(m=>m.inns1_score), inns2 = ms.map(m=>m.inns2_score);
+  const allScores = [...inns1, ...inns2];
+  const batFirstWins = ms.filter(m=>m.winner===m.batting_first).length;
+  const chaseWins = ms.filter(m=>m.winner===m.batting_second).length;
+  return {
+    matches: ms.length,
+    avg1: mean(inns1), avg2: mean(inns2),
+    high: Math.max(...allScores), low: Math.min(...allScores),
+    batFirstWinPct: batFirstWins/ms.length*100,
+    chaseWinPct: chaseWins/ms.length*100
+  };
+}
+
+let venueSeasonChart=null, venueBatChaseChart=null, venueDistChart=null, venueTopScoresChart=null, venuePhaseChart=null;
+
+function renderVenueKpis(k){
+  document.getElementById('venueKpiGrid').innerHTML = `
+    <div class="stat-card"><div class="k">Matches Played</div><div class="v">${k.matches}</div></div>
+    <div class="stat-card"><div class="k">Avg 1st Innings Score</div><div class="v gold">${k.matches? k.avg1.toFixed(0):'—'}</div></div>
+    <div class="stat-card"><div class="k">Avg 2nd Innings Score</div><div class="v cyan">${k.matches? k.avg2.toFixed(0):'—'}</div></div>
+    <div class="stat-card"><div class="k">Highest Team Score</div><div class="v gold">${k.matches? k.high:'—'}</div></div>
+    <div class="stat-card"><div class="k">Lowest Team Score</div><div class="v red">${k.matches? k.low:'—'}</div></div>
+    <div class="stat-card" style="grid-column:span 2;"><div class="k">Bat First Win %</div><div class="v">${k.matches? k.batFirstWinPct.toFixed(0)+'%':'—'}</div></div>
+    <div class="stat-card"><div class="k">Chase Win %</div><div class="v cyan">${k.matches? k.chaseWinPct.toFixed(0)+'%':'—'}</div></div>
+  `;
+}
+
+function renderVenueSeasonChart(venue, team){
+  // Trend chart always spans every season for this venue (+ optional team filter) so the "over time" story is visible
+  const ms = matches.filter(m=> m.venue===venue && (team==='all' || m.team1===team || m.team2===team));
+  const bySeasonAvg = SEASONS.map(s=>{
+    const ss = ms.filter(m=>m.season===s);
+    return ss.length ? mean(ss.map(m=>m.inns1_score)) : null;
+  });
+  const ctx = document.getElementById('venueSeasonChart').getContext('2d');
+  if(venueSeasonChart) venueSeasonChart.destroy();
+  venueSeasonChart = new Chart(ctx,{
+    type:'line',
+    data:{labels:SEASONS, datasets:[{label:'Avg 1st Innings Score', data:bySeasonAvg, borderColor:'#FFD700', backgroundColor:'rgba(255,215,0,0.12)', fill:true, tension:0.35, spanGaps:true, pointRadius:3}]},
+    options: chartOpts('')
+  });
+}
+
+function renderVenueBatChaseChart(k){
+  const ctx = document.getElementById('venueBatChaseChart').getContext('2d');
+  if(venueBatChaseChart) venueBatChaseChart.destroy();
+  venueBatChaseChart = new Chart(ctx,{
+    type:'doughnut',
+    data:{labels:['Bat First Wins','Chasing Wins'], datasets:[{data:[k.batFirstWinPct, k.chaseWinPct], backgroundColor:['#FFD700','#00d2ff'], borderColor:'#0a192f', borderWidth:3}]},
+    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:'#8892b0'}}}}
+  });
+}
+
+function renderVenueDistChart(ms){
+  const bins = [100,120,140,160,180,200,220,240];
+  const labels = bins.slice(0,-1).map((b,i)=>`${b}-${bins[i+1]}`);
+  const counts = labels.map(()=>0);
+  ms.forEach(m=>{
+    const s = m.inns1_score;
+    for(let i=0;i<bins.length-1;i++){ if(s>=bins[i] && s<bins[i+1]){ counts[i]++; break; } }
+  });
+  const ctx = document.getElementById('venueDistChart').getContext('2d');
+  if(venueDistChart) venueDistChart.destroy();
+  venueDistChart = new Chart(ctx,{
+    type:'bar',
+    data:{labels, datasets:[{label:'Matches', data:counts, backgroundColor:'#8a5cff', borderRadius:6}]},
+    options: chartOpts('1st innings score buckets')
+  });
+}
+
+function renderVenueTopScoresChart(ms){
+  const entries = ms.flatMap(m=>[
+    {team:m.batting_first, score:m.inns1_score, season:m.season},
+    {team:m.batting_second, score:m.inns2_score, season:m.season}
+  ]).sort((a,b)=>b.score-a.score).slice(0,10);
+  const ctx = document.getElementById('venueTopScoresChart').getContext('2d');
+  if(venueTopScoresChart) venueTopScoresChart.destroy();
+  venueTopScoresChart = new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels: entries.map(e=>`${TEAM_META[e.team]?.abbr||e.team} '${String(e.season).slice(2)}`),
+      datasets:[{label:'Score', data:entries.map(e=>e.score), backgroundColor:entries.map(e=>TEAM_META[e.team]?.color||'#FFD700'), borderRadius:6}]
+    },
+    options:{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#8892b0'}, grid:{color:'rgba(255,255,255,0.05)'}, beginAtZero:true}, y:{ticks:{color:'#8892b0'}, grid:{display:false}}}
+    }
+  });
+}
+
+function renderVenuePhaseChart(venue, season, team){
+  let ds = deliveries.filter(d=>d.venue===venue && (season==='all' || String(d.season)===String(season)) && (team==='all' || d.batting_team===team));
+  const sub = document.getElementById('venuePhaseSub');
+  if(!ds.length){
+    sub.textContent = 'No ball-by-ball data available for this venue under the current filters (ball-by-ball data is only simulated for a sample of matches).';
+    if(venuePhaseChart){ venuePhaseChart.destroy(); venuePhaseChart=null; }
+    document.getElementById('venuePhaseChart').getContext('2d').clearRect(0,0,9999,9999);
+    return;
+  }
+  const matchCount = new Set(ds.map(d=>d.match_id)).size;
+  sub.textContent = `Average runs per over, by phase — from ball-by-ball data across ${matchCount} sampled match${matchCount===1?'':'es'} at this venue.`;
+  const phases = ['Powerplay','Middle Overs','Death Overs'];
+  const oversInPhase = {Powerplay:6, 'Middle Overs':9, 'Death Overs':5};
+  const perPhase = phases.map(p=>{
+    const pd = ds.filter(d=>d.phase===p);
+    const runs = pd.reduce((a,d)=>a+d.total_runs,0);
+    const innings = new Set(pd.map(d=>d.match_id+'-'+d.inning)).size || 1;
+    return runs/innings/oversInPhase[p];
+  });
+  const ctx = document.getElementById('venuePhaseChart').getContext('2d');
+  if(venuePhaseChart) venuePhaseChart.destroy();
+  venuePhaseChart = new Chart(ctx,{
+    type:'bar',
+    data:{labels:phases, datasets:[{label:'Runs/over', data:perPhase, backgroundColor:['#FFD700','#00d2ff','#8a5cff'], borderRadius:8}]},
+    options: chartOpts('')
+  });
+}
+
+function renderVenueTossImpact(ms){
+  const box = document.getElementById('venueTossImpact');
+  if(!ms.length){ box.innerHTML = `<p class="empty-note">No matches for this selection.</p>`; return; }
+  const tossWinnerWonPct = ms.filter(m=>m.toss_winner===m.winner).length/ms.length*100;
+  const batDecided = ms.filter(m=>m.toss_decision==='bat');
+  const fieldDecided = ms.filter(m=>m.toss_decision==='field');
+  const batDecidedWinPct = batDecided.length ? batDecided.filter(m=>m.toss_winner===m.winner).length/batDecided.length*100 : null;
+  const fieldDecidedWinPct = fieldDecided.length ? fieldDecided.filter(m=>m.toss_winner===m.winner).length/fieldDecided.length*100 : null;
+  box.innerHTML = `
+    <div class="grid3">
+      <div class="stat-card" style="grid-column:span 3;"><div class="k">Toss Winner → Match Winner</div><div class="v gold">${tossWinnerWonPct.toFixed(0)}%</div></div>
+      <div class="stat-card" style="grid-column:span 3;margin-top:8px;"><div class="k">Toss Winner Win % — Chose to Bat First</div><div class="v">${batDecidedWinPct===null?'—':batDecidedWinPct.toFixed(0)+'%'}</div></div>
+      <div class="stat-card" style="grid-column:span 3;margin-top:8px;"><div class="k">Toss Winner Win % — Chose to Field First</div><div class="v cyan">${fieldDecidedWinPct===null?'—':fieldDecidedWinPct.toFixed(0)+'%'}</div></div>
+    </div>`;
+}
+
+function renderVenueInsight(venue, k){
+  const el = document.getElementById('venueInsightText');
+  if(!k.matches){ el.textContent = 'No matches found for this venue under the current filters.'; return; }
+  const shortName = venue.split(',')[0];
+  const scoringTag = k.avg1>=180 ? 'a high-scoring' : k.avg1>=155 ? 'a balanced, moderate-scoring' : 'a bowling-friendly, lower-scoring';
+  const chaseTag = k.chaseWinPct>=55 ? 'a clear chasing advantage' : k.chaseWinPct<=45 ? 'an advantage for teams batting first' : 'no strong bias either way';
+  const highScoreNote = k.high>=200 ? `The venue has produced team totals as high as ${k.high}, pointing to favourable batting conditions on its best days.` : `The highest total recorded here in this selection is ${k.high}, suggesting scoring rarely gets extreme.`;
+  el.innerHTML = `${shortName} tends to be ${scoringTag} venue, with an average first-innings score of ${k.avg1.toFixed(0)} across ${k.matches} match${k.matches===1?'':'es'}. Teams chasing have won ${k.chaseWinPct.toFixed(0)}% of matches here, suggesting ${chaseTag}. ${highScoreNote}`;
+}
+
+function computeVenueRating(venue, k, ms){
+  const highScoreRate = ms.length ? ms.flatMap(m=>[m.inns1_score,m.inns2_score]).filter(s=>s>=180).length/(ms.length*2) : 0;
+  const avgScore = (k.avg1+k.avg2)/2;
+  const tossWinnerWonPct = ms.length ? ms.filter(m=>m.toss_winner===m.winner).length/ms.length*100 : 50;
+
+  const battingFriendliness = Math.round(Math.max(1, Math.min(5, 3 + (avgScore-GLOBAL_AVG_SCORE)/15)));
+  const chasingAdvantage = k.chaseWinPct>=65?5 : k.chaseWinPct>=55?4 : k.chaseWinPct>=45?3 : k.chaseWinPct>=35?2 : 1;
+  const scoringLevel = Math.round(Math.max(1, Math.min(5, 3 + (highScoreRate-GLOBAL_HIGH_SCORE_RATE)*100/12)));
+  const tossImpact = tossWinnerWonPct>=60?5 : tossWinnerWonPct>=55?4 : tossWinnerWonPct>=50?3 : tossWinnerWonPct>=45?2 : 1;
+
+  return {battingFriendliness, chasingAdvantage, scoringLevel, tossImpact};
+}
+
+function renderVenueRating(venue, k, ms){
+  const r = computeVenueRating(venue, k, ms);
+  document.getElementById('venueRatingGrid').innerHTML = `
+    <div class="stat-card"><div class="k">Batting Friendliness</div><div class="v gold">${starsHTML(r.battingFriendliness)}</div></div>
+    <div class="stat-card"><div class="k">Chasing Advantage</div><div class="v cyan">${starsHTML(r.chasingAdvantage)}</div></div>
+    <div class="stat-card"><div class="k">Scoring Level</div><div class="v gold">${starsHTML(r.scoringLevel)}</div></div>
+    <div class="stat-card"><div class="k">Toss Impact</div><div class="v">${starsHTML(r.tossImpact)}</div></div>
+  `;
+  document.getElementById('venueRatingModal').innerHTML = `
+    <b style="color:#fff;">How this is calculated</b><br><br>
+    <b>Batting Friendliness</b> — this venue's average combined 1st/2nd innings score, compared against the league-wide average across every simulated venue.<br>
+    <b>Chasing Advantage</b> — the share of matches at this venue won by the team batting second.<br>
+    <b>Scoring Level</b> — how often team totals here cross 180, compared against the league-wide rate.<br>
+    <b>Toss Impact</b> — how often the toss winner has gone on to win the match at this venue.<br><br>
+    These are analytical scores computed from the simulated historical data in this app. They are not an official IPL rating.
+  `;
+}
+
+function renderVenueComparison(){
+  const vA = venueCompareA.value, vB = venueCompareB.value;
+  const msA = matches.filter(m=>m.venue===vA), msB = matches.filter(m=>m.venue===vB);
+  const kA = venueKpis(msA), kB = venueKpis(msB);
+  function marginStr(ms){
+    const runWins = ms.filter(m=>m.win_by_runs>0);
+    const wktWins = ms.filter(m=>m.win_by_wickets>0);
+    const r = runWins.length ? mean(runWins.map(m=>m.win_by_runs)).toFixed(0)+' runs' : '—';
+    const w = wktWins.length ? mean(wktWins.map(m=>m.win_by_wickets)).toFixed(1)+' wkts' : '—';
+    return `${r} / ${w}`;
+  }
+  const rows = [
+    ['Average Score', kA.matches?((kA.avg1+kA.avg2)/2).toFixed(0):'—', kB.matches?((kB.avg1+kB.avg2)/2).toFixed(0):'—'],
+    ['Highest Score', kA.matches?kA.high:'—', kB.matches?kB.high:'—'],
+    ['Bat First Win %', kA.matches?kA.batFirstWinPct.toFixed(0)+'%':'—', kB.matches?kB.batFirstWinPct.toFixed(0)+'%':'—'],
+    ['Chase Win %', kA.matches?kA.chaseWinPct.toFixed(0)+'%':'—', kB.matches?kB.chaseWinPct.toFixed(0)+'%':'—'],
+    ['Avg Winning Margin', marginStr(msA), marginStr(msB)],
+  ];
+  document.getElementById('venueCompareTable').innerHTML = `
+    <div class="stat-card" style="margin-bottom:10px;">
+      <div class="row" style="margin-bottom:0;">
+        <div class="k" style="font-size:11.5px;color:var(--gold);">${vA.split(',')[0]}</div>
+        <div class="k" style="font-size:11.5px;color:var(--cyan);text-align:right;">${vB.split(',')[0]}</div>
+      </div>
+    </div>
+    ${rows.map(r=>`
+      <div class="stat-card" style="margin-bottom:8px;">
+        <div class="k">${r[0]}</div>
+        <div class="row" style="margin-top:4px;">
+          <div class="v gold" style="font-size:16px;">${r[1]}</div>
+          <div class="v cyan" style="font-size:16px;text-align:right;">${r[2]}</div>
+        </div>
+      </div>`).join('')}
+  `;
+}
+
+function renderVenueIntelligence(){
+  const venue = venuePickSelect.value, season = venueSeasonFilter.value, team = venueTeamFilter.value;
+  const ms = matchesForVenue(venue, season, team);
+  const k = venueKpis(ms);
+  renderVenueKpis(k);
+  renderVenueSeasonChart(venue, team);
+  renderVenueBatChaseChart(k);
+  renderVenueDistChart(ms);
+  renderVenueTopScoresChart(ms);
+  renderVenuePhaseChart(venue, season, team);
+  renderVenueTossImpact(ms);
+  renderVenueInsight(venue, k);
+  renderVenueRating(venue, k, ms);
+}
+
+venuePickSelect.addEventListener('change', renderVenueIntelligence);
+venueSeasonFilter.addEventListener('change', renderVenueIntelligence);
+venueTeamFilter.addEventListener('change', renderVenueIntelligence);
+document.getElementById('venueResetBtn').addEventListener('click', ()=>{
+  venuePickSelect.selectedIndex = 0;
+  venueSeasonFilter.value = 'all';
+  venueTeamFilter.value = 'all';
+  renderVenueIntelligence();
+});
+venueCompareA.addEventListener('change', renderVenueComparison);
+venueCompareB.addEventListener('change', renderVenueComparison);
+document.getElementById('venueRatingInfoBtn').addEventListener('click', ()=>{
+  const modal = document.getElementById('venueRatingModal');
+  modal.style.display = modal.style.display==='none' ? 'block' : 'none';
+});
+
+/* ---------------- Init ---------------- */
+renderMatchup();
+renderAnalytics();
+renderVenueIntelligence();
+renderVenueComparison();
+</script>
+</body>
+</html>
